@@ -3,6 +3,60 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getLocale, type Locale } from '../lib/locales';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the map components to avoid SSR issues
+const MapContainer = dynamic(() => import('react-leaflet').then(mod => ({ default: mod.MapContainer })), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(mod => ({ default: mod.TileLayer })), { ssr: false });
+const GeoJSON = dynamic(() => import('react-leaflet').then(mod => ({ default: mod.GeoJSON })), { ssr: false });
+// FitBounds component to automatically fit map to GeoJSON bounds
+function FitBounds({ geojsonData }: { geojsonData: any }) {
+  // Import useMap dynamically to avoid SSR issues
+  const useMap = require('react-leaflet').useMap;
+  const map = useMap();
+  
+  useEffect(() => {
+    if (map) {
+      // Fix Leaflet marker icons when map is ready
+      import('leaflet').then((L) => {
+        delete (L.default.Icon.Default.prototype as any)._getIconUrl;
+        L.default.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        });
+      });
+    }
+  }, [map]);
+  
+  useEffect(() => {
+    if (geojsonData && map) {
+      try {
+        // Import Leaflet dynamically to avoid SSR issues
+        import('leaflet').then((L) => {
+          // Create a temporary GeoJSON layer to calculate bounds
+          const tempLayer = L.default.geoJSON(geojsonData);
+          const bounds = tempLayer.getBounds();
+          
+          // Check if bounds are valid (not empty)
+          if (bounds.isValid()) {
+            // Fit the map to show all features with some padding
+            map.fitBounds(bounds, {
+              padding: [20, 20], // Add padding around the features
+              maxZoom: 16, // Don't zoom in too much for small areas
+              animate: true, // Smooth animation
+              duration: 1.0 // Animation duration in seconds
+            });
+          }
+        });
+      } catch (error) {
+        console.warn('Error fitting bounds:', error);
+      }
+    }
+  }, [geojsonData, map]);
+  
+  return null; // This component doesn't render anything
+}
 
 export default function Home() {
   const searchParams = useSearchParams();
@@ -26,6 +80,8 @@ export default function Home() {
     message: string;
   }>>([]);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const [isMapVisible, setIsMapVisible] = useState(true);
   
   const t = getLocale(locale);
 
@@ -59,6 +115,24 @@ export default function Home() {
       });
     }
   }, [outputData]);
+
+  // Update map key when output data changes to force re-render
+  useEffect(() => {
+    if (outputData) {
+      setMapKey(prev => prev + 1);
+    }
+  }, [outputData]);
+
+  // Auto-hide map when warnings appear, auto-show when warnings are cleared
+  useEffect(() => {
+    if (validationWarnings.length > 0) {
+      setIsMapVisible(false);
+    } else {
+      setIsMapVisible(true);
+    }
+  }, [validationWarnings]);
+
+
 
   // Update URL when locale or theme changes
   const updateUrl = (newLocale: Locale, newTheme: boolean) => {
@@ -567,19 +641,19 @@ export default function Home() {
             />
             
             <div className="mt-4 space-y-4">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 <input
                   type="checkbox"
                   id="includeMarkers"
                   checked={includeMarkers}
                   onChange={(e) => setIncludeMarkers(e.target.checked)}
-                  className={`rounded text-blue-600 focus:ring-blue-500 transition-colors duration-200 ${
+                  className={`w-5 h-5 rounded text-blue-600 focus:ring-blue-500 focus:ring-2 transition-colors duration-200 ${
                     isDarkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300'
                   }`}
                 />
                 <label 
                   htmlFor="includeMarkers"
-                  className={`text-sm cursor-pointer transition-colors duration-200 ${
+                  className={`text-base font-medium cursor-pointer transition-colors duration-200 ${
                     isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-gray-900'
                   }`}
                 >
@@ -845,6 +919,85 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Map Section - Shows when there's output data */}
+        {outputData && (
+          <div className="lg:col-span-2 mt-8">
+            <div className={`rounded-lg shadow-md p-6 transition-colors duration-200 ${
+              isDarkMode ? 'bg-gray-800' : 'bg-white'
+            }`}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className={`text-xl font-semibold transition-colors duration-200 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  {t.mapPreview}
+                </h2>
+                {validationWarnings.length > 0 && !isMapVisible && (
+                  <button
+                    onClick={() => setIsMapVisible(true)}
+                    className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
+                  >
+                    {t.showMap}
+                  </button>
+                )}
+              </div>
+              
+              {outputData && isMapVisible && (
+                <div className="h-96 md:h-[600px] w-full rounded-md overflow-hidden">
+                  <MapContainer
+                    key={mapKey}
+                    center={[0, 0] as [number, number]}
+                    zoom={2}
+                    style={{ height: '100%', width: '100%' }}
+                    className="z-0"
+                    ref={(map) => {
+                      if (map) {
+                        // Force a resize after the map is created
+                        setTimeout(() => {
+                          map.invalidateSize();
+                        }, 100);
+                      }
+                    }}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+                    />
+                    <GeoJSON
+                      data={JSON.parse(outputData)}
+                      style={(feature: any) => ({
+                        fillColor: '#3b82f6',
+                        weight: 2,
+                        opacity: 1,
+                        color: '#1e40af',
+                        fillOpacity: 0.6,
+                      })}
+                      onEachFeature={(feature: any, layer: any) => {
+                        if (feature.properties && feature.properties.name) {
+                          layer.bindPopup(`<b>${feature.properties.name}</b>`);
+                        }
+                      }}
+                    />
+                    <FitBounds geojsonData={JSON.parse(outputData)} />
+                  </MapContainer>
+                </div>
+              )}
+              
+              {validationWarnings.length > 0 && !isMapVisible && (
+                <div className={`text-center py-8 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  <p className="text-sm">
+                    {locale === 'en' 
+                      ? 'Map hidden due to warnings. Click "Show Map" to view anyway.'
+                      : 'Peta disembunyikan karena peringatan. Klik "Tampilkan Peta" untuk melihat.'
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Validation Warnings Display */}
         {validationWarnings.length > 0 && (
