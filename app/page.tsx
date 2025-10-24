@@ -58,6 +58,27 @@ export default function Home() {
       // Validate JSON
       const parsedData = JSON.parse(inputData);
       
+      // Validate markers if includeMarkers is enabled
+      if (includeMarkers && markers.length > 0) {
+        for (let i = 0; i < markers.length; i++) {
+          const marker = markers[i];
+          const lat = parseFloat(marker.lat);
+          const lng = parseFloat(marker.lng);
+          
+          if (!marker.lat || !marker.lng || isNaN(lat) || isNaN(lng)) {
+            throw new Error(`Marker ${i + 1}: Please provide valid latitude and longitude values`);
+          }
+          
+          if (lat < -90 || lat > 90) {
+            throw new Error(`Marker ${i + 1}: Latitude must be between -90 and 90 degrees`);
+          }
+          
+          if (lng < -180 || lng > 180) {
+            throw new Error(`Marker ${i + 1}: Longitude must be between -180 and 180 degrees`);
+          }
+        }
+      }
+      
       const response = await fetch('/api/convert', {
         method: 'POST',
         headers: {
@@ -139,7 +160,6 @@ export default function Home() {
   const handleLoadExample = () => {
     setInputData(`[
   {
-    "area_name": "LRT Indonesia",
     "area_list": [
       {
         "name": "Stasiun LRT Ciliwung (lat/long format)",
@@ -152,7 +172,6 @@ export default function Home() {
     ]
   },
   {
-    "area_name": "MRT Stations",
     "area_list": [
       {
         "name": "Stasiun MRT ASEAN (latitude/longitude format)",
@@ -165,11 +184,47 @@ export default function Home() {
     ]
   },
   {
-    "area_name": "KRL Stations",
     "area_list": [
       {
         "name": "Stasiun Angke (mixed format example)",
         "polygon": "[{\\"lat\\":-6.144707878120549,\\"long\\":106.80058687353063},{\\"lat\\":-6.144689210527343,\\"lng\\":106.80098115825582},{\\"latitude\\":-6.145465248492736,\\"longitude\\":106.80101066255499},{\\"lat\\":-6.145459914902338,\\"lon\\":106.80064588212896}]"
+      }
+    ]
+  },
+  {
+    "area_list": [
+      {
+        "name": "Jakarta Timur (real JSON array format)",
+        "polygon": [
+          {
+            "lat": -6.1649059095488115,
+            "long": 106.8687362055075
+          },
+          {
+            "lat": -6.167636600868331,
+            "long": 106.97722619574188
+          },
+          {
+            "lat": -6.247844358254605,
+            "long": 106.9456405023825
+          },
+          {
+            "lat": -6.282995382772532,
+            "long": 106.95782846014617
+          },
+          {
+            "lat": -6.305176847085295,
+            "long": 106.93019097845672
+          },
+          {
+            "lat": -6.303129367000778,
+            "long": 106.885215697695
+          },
+          {
+            "lat": -6.2195170568553335,
+            "long": 106.86736291449188
+          }
+        ]
       }
     ]
   }
@@ -280,17 +335,21 @@ export default function Home() {
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
+                  id="includeMarkers"
                   checked={includeMarkers}
                   onChange={(e) => setIncludeMarkers(e.target.checked)}
                   className={`rounded text-blue-600 focus:ring-blue-500 transition-colors duration-200 ${
                     isDarkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300'
                   }`}
                 />
-                <span className={`text-sm transition-colors duration-200 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
+                <label 
+                  htmlFor="includeMarkers"
+                  className={`text-sm cursor-pointer transition-colors duration-200 ${
+                    isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-gray-900'
+                  }`}
+                >
                   {t.includeCustomMarker}
-                </span>
+                </label>
               </div>
               
               {includeMarkers && (
@@ -544,6 +603,20 @@ export default function Home() {
                 <div>{t.coordinateFormat2}</div>
                 <div>{t.coordinateFormat3}</div>
                 <div>{t.coordinateFormat4}</div>
+              </div>
+            </div>
+            
+            <div className="mt-3">
+              <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                isDarkMode ? 'text-blue-300' : 'text-blue-900'
+              }`}>
+                {t.polygonFormatSupport}
+              </h5>
+              <div className={`text-sm space-y-1 font-mono transition-colors duration-200 ${
+                isDarkMode ? 'text-blue-200' : 'text-blue-800'
+              }`}>
+                <div>{t.polygonFormat1}</div>
+                <div>{t.polygonFormat2}</div>
               </div>
             </div>
           </div>

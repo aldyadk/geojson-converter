@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 interface StationData {
-  id: number;
-  id_landmark: number;
   name: string;
-  address: string;
-  type: string;
-  polygon: string;
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
+  polygon: string | Array<{ lat?: number; lng?: number; long?: number; latitude?: number; longitude?: number; lon?: number }>;
 }
 
 interface AreaData {
-  id: number;
-  area_name: string;
   area_list: StationData[];
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
-  is_deleted: boolean;
 }
 
 interface GeoJSONFeature {
@@ -66,8 +53,19 @@ export async function POST(request: NextRequest) {
 
       for (const station of area.area_list) {
         try {
-          // Parse the polygon string
-          const polygonData = JSON.parse(station.polygon);
+          // Handle both stringified JSON and real JSON array formats
+          let polygonData: any;
+          
+          if (typeof station.polygon === 'string') {
+            // Parse the polygon string
+            polygonData = JSON.parse(station.polygon);
+          } else if (Array.isArray(station.polygon)) {
+            // Use the polygon array directly
+            polygonData = station.polygon;
+          } else {
+            console.error(`Invalid polygon format for station ${station.name}:`, station.polygon);
+            continue;
+          }
           
           if (!Array.isArray(polygonData) || polygonData.length === 0) {
             continue;
@@ -126,7 +124,7 @@ export async function POST(request: NextRequest) {
 
           features.push(polygonFeature);
         } catch (error) {
-          console.error(`Error processing station ${station.id}:`, error);
+          console.error(`Error processing station ${station.name}:`, error);
           // Continue processing other stations
         }
       }
