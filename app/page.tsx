@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getLocale, type Locale } from '../lib/locales';
 
 export default function Home() {
   const [inputData, setInputData] = useState('');
@@ -10,10 +11,13 @@ export default function Home() {
   const [includeMarkers, setIncludeMarkers] = useState(false);
   const [markers, setMarkers] = useState<Array<{lat: string, lng: string, name: string}>>([]);
   const [showToast, setShowToast] = useState(false);
+  const [locale, setLocale] = useState<Locale>('en');
+  
+  const t = getLocale(locale);
 
   const handleConvert = async () => {
     if (!inputData.trim()) {
-      setError('Please enter JSON data');
+      setError(t.pleaseEnterJsonData);
       return;
     }
 
@@ -43,13 +47,13 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to convert data');
+        throw new Error(errorData.error || t.failedToConvertData);
       }
 
       const geojson = await response.json();
       setOutputData(JSON.stringify(geojson, null, 2));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : t.anErrorOccurred);
     } finally {
       setLoading(false);
     }
@@ -120,12 +124,35 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 py-8 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            GeoJSON Maker
-          </h1>
+          <div className="flex justify-center items-center gap-4 mb-4">
+            <h1 className="text-4xl font-bold text-gray-900">
+              {t.title}
+            </h1>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setLocale('en')}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  locale === 'en' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => setLocale('id')}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  locale === 'id' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                ID
+              </button>
+            </div>
+          </div>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Convert station data with polygon coordinates to GeoJSON format. 
-            Perfect for mapping applications and GIS tools.
+            {t.description}
           </p>
         </div>
 
@@ -133,19 +160,19 @@ export default function Home() {
           {/* Input Section */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Input Data</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t.inputData}</h2>
               <button
                 onClick={handleLoadExample}
                 className="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
               >
-                Load Example
+                {t.loadExample}
               </button>
             </div>
             
             <textarea
               value={inputData}
               onChange={(e) => setInputData(e.target.value)}
-              placeholder="Paste your JSON data here..."
+              placeholder={t.placeholderInput}
               className="w-full h-96 p-4 border border-gray-300 rounded-md font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
             />
             
@@ -157,65 +184,65 @@ export default function Home() {
                   onChange={(e) => setIncludeMarkers(e.target.checked)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm text-gray-700">Include custom marker</span>
+                <span className="text-sm text-gray-700">{t.includeCustomMarker}</span>
               </div>
               
               {includeMarkers && (
                 <div className="bg-gray-50 p-4 rounded-md space-y-3">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-gray-700">Custom Markers</h3>
+                    <h3 className="text-sm font-medium text-gray-700">{t.customMarkers}</h3>
                     <button
                       type="button"
                       onClick={addMarker}
                       className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
                     >
-                      + Add Marker
+                      {t.addMarker}
                     </button>
                   </div>
                   
                   {markers.length === 0 && (
                     <p className="text-xs text-gray-500 text-center py-2">
-                      No markers added yet. Click "Add Marker" to create one.
+                      {t.noMarkersYet}
                     </p>
                   )}
                   
                   {markers.map((marker, index) => (
                     <div key={index} className="bg-white p-3 rounded-md border border-gray-200 space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-gray-600">Marker {index + 1}</span>
+                        <span className="text-xs font-medium text-gray-600">{t.marker} {index + 1}</span>
                         <button
                           type="button"
                           onClick={() => removeMarker(index)}
                           className="text-red-500 hover:text-red-700 text-xs"
                         >
-                          Remove
+                          {t.remove}
                         </button>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Latitude
+                            {t.latitude}
                           </label>
                           <input
                             type="number"
                             step="any"
                             value={marker.lat}
                             onChange={(e) => updateMarker(index, 'lat', e.target.value)}
-                            placeholder="e.g., -6.2428"
+                            placeholder={t.placeholderLatitude}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                           />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Longitude
+                            {t.longitude}
                           </label>
                           <input
                             type="number"
                             step="any"
                             value={marker.lng}
                             onChange={(e) => updateMarker(index, 'lng', e.target.value)}
-                            placeholder="e.g., 106.8628"
+                            placeholder={t.placeholderLongitude}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                           />
                         </div>
@@ -223,13 +250,13 @@ export default function Home() {
                       
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Marker Name (optional)
+                          {t.markerName}
                         </label>
                         <input
                           type="text"
                           value={marker.name}
                           onChange={(e) => updateMarker(index, 'name', e.target.value)}
-                          placeholder="e.g., Custom Location"
+                          placeholder={t.placeholderMarkerName}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                         />
                       </div>
@@ -244,7 +271,7 @@ export default function Home() {
                   disabled={loading}
                   className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {loading ? 'Converting...' : 'Convert to GeoJSON'}
+                  {loading ? t.converting : t.convertToGeoJSON}
                 </button>
               </div>
             </div>
@@ -253,20 +280,20 @@ export default function Home() {
           {/* Output Section */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">GeoJSON Output</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t.geojsonOutput}</h2>
               {outputData && (
                 <div className="flex gap-2">
                   <button
                     onClick={handleCopy}
                     className="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
                   >
-                    Copy
+                    {t.copy}
                   </button>
                   <button
                     onClick={handleDownload}
                     className="px-4 py-2 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
                   >
-                    Download
+                    {t.download}
                   </button>
                 </div>
               )}
@@ -275,7 +302,7 @@ export default function Home() {
             <textarea
               value={outputData}
               readOnly
-              placeholder="GeoJSON output will appear here..."
+              placeholder={t.placeholderOutput}
               className="w-full h-96 p-4 border border-gray-300 rounded-md font-mono text-sm resize-none bg-white text-gray-900"
             />
           </div>
@@ -291,7 +318,7 @@ export default function Home() {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <h3 className="text-sm font-medium text-red-800">{t.error}</h3>
                 <div className="mt-2 text-sm text-red-700">
                   {error}
                 </div>
@@ -302,19 +329,18 @@ export default function Home() {
 
         {/* Instructions */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-md p-6">
-          <h3 className="text-lg font-medium text-blue-900 mb-3">How to use:</h3>
+          <h3 className="text-lg font-medium text-blue-900 mb-3">{t.howToUse}</h3>
           <ol className="list-decimal list-inside space-y-2 text-blue-800">
-            <li>Paste your JSON data in the input field (or click "Load Example" to see the expected format)</li>
-            <li>Click "Convert to GeoJSON" to transform your data</li>
-            <li>Download the resulting GeoJSON file or copy the output</li>
-            <li>Use the GeoJSON in mapping applications like Leaflet, Mapbox, or QGIS</li>
+            <li>{t.step1}</li>
+            <li>{t.step2}</li>
+            <li>{t.step3}</li>
+            <li>{t.step4}</li>
           </ol>
           
           <div className="mt-4">
-            <h4 className="font-medium text-blue-900 mb-2">Expected Input Format:</h4>
+            <h4 className="font-medium text-blue-900 mb-2">{t.expectedInputFormat}</h4>
             <p className="text-sm text-blue-800">
-              Your JSON should contain an array of areas, each with an <code className="bg-blue-100 px-1 rounded">area_list</code> containing stations. 
-              Each station should have a <code className="bg-blue-100 px-1 rounded">polygon</code> field with lat/long coordinates as a JSON string.
+              {t.expectedInputDescription}
             </p>
           </div>
         </div>
@@ -327,7 +353,7 @@ export default function Home() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span className="font-medium">Copied to clipboard!</span>
+            <span className="font-medium">{t.copiedToClipboard}</span>
           </div>
         </div>
       )}
