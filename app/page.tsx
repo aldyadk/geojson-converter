@@ -139,10 +139,37 @@ export default function Home() {
   const handleLoadExample = () => {
     setInputData(`[
   {
+    "area_name": "LRT Indonesia",
     "area_list": [
       {
-        "name": "Stasiun LRT Ciliwung",
+        "name": "Stasiun LRT Ciliwung (lat/long format)",
         "polygon": "[{\\"lat\\":-6.242799927901021,\\"long\\":106.86279925611093},{\\"lat\\":-6.243423842559002,\\"long\\":106.86278852727487},{\\"lat\\":-6.243439840360971,\\"long\\":106.86401161458566},{\\"lat\\":-6.243605150952711,\\"long\\":106.86500403192117},{\\"lat\\":-6.243722468115187,\\"long\\":106.86544927861765},{\\"lat\\":-6.243146547247209,\\"long\\":106.86548146512582},{\\"lat\\":-6.242959906089307,\\"long\\":106.86468753125742}]"
+      },
+      {
+        "name": "Stasiun LRT Example (lat/lng format)",
+        "polygon": "[{\\"lat\\":-6.2428,\\"lng\\":106.8628},{\\"lat\\":-6.2434,\\"lng\\":106.8628},{\\"lat\\":-6.2434,\\"lng\\":106.8640},{\\"lat\\":-6.2428,\\"lng\\":106.8640}]"
+      }
+    ]
+  },
+  {
+    "area_name": "MRT Stations",
+    "area_list": [
+      {
+        "name": "Stasiun MRT ASEAN (latitude/longitude format)",
+        "polygon": "[{\\"latitude\\":-6.2410762828289155,\\"longitude\\":106.79954744427533},{\\"latitude\\":-6.24114027432065,\\"longitude\\":106.80026627629132},{\\"latitude\\":-6.237588734710916,\\"longitude\\":106.80005169957013},{\\"latitude\\":-6.236656851525913,\\"longitude\\":106.80003426521154},{\\"latitude\\":-6.236761505156429,\\"longitude\\":106.797461356214},{\\"latitude\\":-6.237410090566302,\\"longitude\\":106.79735607951017},{\\"latitude\\":-6.2410096250167175,\\"longitude\\":106.7973614439282}]"
+      },
+      {
+        "name": "Stasiun MRT Benhil (lat/lon format)",
+        "polygon": "[{\\"lat\\":-6.214703446881995,\\"lon\\":106.81502263030623},{\\"lat\\":-6.213012917242654,\\"lon\\":106.81781212768172},{\\"lat\\":-6.215499380486178,\\"lon\\":106.81991095623587},{\\"lat\\":-6.21786184298636,\\"lon\\":106.81735078773116}]"
+      }
+    ]
+  },
+  {
+    "area_name": "KRL Stations",
+    "area_list": [
+      {
+        "name": "Stasiun Angke (mixed format example)",
+        "polygon": "[{\\"lat\\":-6.144707878120549,\\"long\\":106.80058687353063},{\\"lat\\":-6.144689210527343,\\"lng\\":106.80098115825582},{\\"latitude\\":-6.145465248492736,\\"longitude\\":106.80101066255499},{\\"lat\\":-6.145459914902338,\\"lon\\":106.80064588212896}]"
       }
     ]
   }
@@ -503,6 +530,22 @@ export default function Home() {
             }`}>
               {t.expectedInputDescription}
             </p>
+            
+            <div className="mt-3">
+              <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                isDarkMode ? 'text-blue-300' : 'text-blue-900'
+              }`}>
+                {t.supportedCoordinateFormats}
+              </h5>
+              <div className={`text-sm space-y-1 font-mono transition-colors duration-200 ${
+                isDarkMode ? 'text-blue-200' : 'text-blue-800'
+              }`}>
+                <div>{t.coordinateFormat1}</div>
+                <div>{t.coordinateFormat2}</div>
+                <div>{t.coordinateFormat3}</div>
+                <div>{t.coordinateFormat4}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -73,11 +73,35 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Convert lat/long to GeoJSON format (longitude, latitude)
-          const coordinates = polygonData.map((point: { lat: number; long: number }) => [
-            point.long, // longitude first
-            point.lat   // latitude second
-          ]);
+          // Convert coordinates to GeoJSON format (longitude, latitude)
+          // Support multiple coordinate field formats
+          const coordinates = polygonData.map((point: any) => {
+            let lat: number, lng: number;
+            
+            // Try different coordinate field name combinations
+            if (point.lat !== undefined && point.long !== undefined) {
+              // Format: { lat: -6.2428, long: 106.8628 }
+              lat = point.lat;
+              lng = point.long;
+            } else if (point.lat !== undefined && point.lng !== undefined) {
+              // Format: { lat: -6.2428, lng: 106.8628 }
+              lat = point.lat;
+              lng = point.lng;
+            } else if (point.latitude !== undefined && point.longitude !== undefined) {
+              // Format: { latitude: -6.2428, longitude: 106.8628 }
+              lat = point.latitude;
+              lng = point.longitude;
+            } else if (point.lat !== undefined && point.lon !== undefined) {
+              // Format: { lat: -6.2428, lon: 106.8628 }
+              lat = point.lat;
+              lng = point.lon;
+            } else {
+              // Skip invalid coordinate format
+              throw new Error(`Invalid coordinate format: ${JSON.stringify(point)}`);
+            }
+            
+            return [lng, lat]; // GeoJSON format: [longitude, latitude]
+          });
 
           // Ensure the polygon is closed (first and last points are the same)
           if (coordinates.length > 0) {
