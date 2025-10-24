@@ -158,7 +158,53 @@ export default function Home() {
   };
 
   const handleLoadExample = () => {
-    setInputData(`[
+    // Randomly choose between simple array format and complex nested structure
+    const useSimpleFormat = Math.random() < 0.5;
+    
+    if (useSimpleFormat) {
+      // Simple array format
+      setInputData(`[
+  {
+    "name": "Jakarta Timur (simple array format)",
+    "polygon": [
+      {
+        "lat": -6.1649059095488115,
+        "long": 106.8687362055075
+      },
+      {
+        "lat": -6.167636600868331,
+        "long": 106.97722619574188
+      },
+      {
+        "lat": -6.247844358254605,
+        "long": 106.9456405023825
+      },
+      {
+        "lat": -6.282995382772532,
+        "long": 106.95782846014617
+      },
+      {
+        "lat": -6.305176847085295,
+        "long": 106.93019097845672
+      },
+      {
+        "lat": -6.303129367000778,
+        "long": 106.885215697695
+      },
+      {
+        "lat": -6.2195170568553335,
+        "long": 106.86736291449188
+      }
+    ]
+  },
+  {
+    "name": "Stasiun LRT Example (lat/lng format)",
+    "polygon": "[{\\"lat\\":-6.2428,\\"lng\\":106.8628},{\\"lat\\":-6.2434,\\"lng\\":106.8628},{\\"lat\\":-6.2434,\\"lng\\":106.8640},{\\"lat\\":-6.2428,\\"lng\\":106.8640}]"
+  }
+]`);
+    } else {
+      // Complex nested structure format
+      setInputData(`[
   {
     "area_list": [
       {
@@ -229,6 +275,7 @@ export default function Home() {
     ]
   }
 ]`);
+    }
   };
 
   return (
@@ -617,6 +664,33 @@ export default function Home() {
               }`}>
                 <div>{t.polygonFormat1}</div>
                 <div>{t.polygonFormat2}</div>
+              </div>
+            </div>
+            
+            <div className="mt-3">
+              <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                isDarkMode ? 'text-blue-300' : 'text-blue-900'
+              }`}>
+                {t.dataStructureSupport}
+              </h5>
+              <div className={`text-sm space-y-1 font-mono transition-colors duration-200 ${
+                isDarkMode ? 'text-blue-200' : 'text-blue-800'
+              }`}>
+                <div>{t.dataStructure1}</div>
+                <div>{t.dataStructure2}</div>
+              </div>
+            </div>
+            
+            <div className="mt-3">
+              <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                isDarkMode ? 'text-red-300' : 'text-red-900'
+              }`}>
+                {t.requiredFields}
+              </h5>
+              <div className={`text-sm font-medium transition-colors duration-200 ${
+                isDarkMode ? 'text-red-200' : 'text-red-800'
+              }`}>
+                {t.requiredFieldsNote}
               </div>
             </div>
           </div>
