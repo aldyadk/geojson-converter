@@ -8,9 +8,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [includeMarkers, setIncludeMarkers] = useState(false);
-  const [markerLat, setMarkerLat] = useState('');
-  const [markerLng, setMarkerLng] = useState('');
-  const [markerName, setMarkerName] = useState('');
+  const [markers, setMarkers] = useState<Array<{lat: string, lng: string, name: string}>>([]);
+  const [showToast, setShowToast] = useState(false);
 
   const handleConvert = async () => {
     if (!inputData.trim()) {
@@ -34,11 +33,11 @@ export default function Home() {
         body: JSON.stringify({
           data: parsedData,
           includeMarkers: includeMarkers,
-          markerData: includeMarkers ? {
-            lat: parseFloat(markerLat),
-            lng: parseFloat(markerLng),
-            name: markerName || 'Custom Marker'
-          } : null
+          markers: includeMarkers ? markers.map(marker => ({
+            lat: parseFloat(marker.lat),
+            lng: parseFloat(marker.lng),
+            name: marker.name || 'Custom Marker'
+          })) : []
         }),
       });
 
@@ -75,7 +74,8 @@ export default function Home() {
 
     try {
       await navigator.clipboard.writeText(outputData);
-      // You could add a toast notification here if desired
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
@@ -84,7 +84,23 @@ export default function Home() {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     }
+  };
+
+  const addMarker = () => {
+    setMarkers([...markers, { lat: '', lng: '', name: '' }]);
+  };
+
+  const removeMarker = (index: number) => {
+    setMarkers(markers.filter((_, i) => i !== index));
+  };
+
+  const updateMarker = (index: number, field: 'lat' | 'lng' | 'name', value: string) => {
+    const updatedMarkers = [...markers];
+    updatedMarkers[index][field] = value;
+    setMarkers(updatedMarkers);
   };
 
   const handleLoadExample = () => {
@@ -101,7 +117,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
@@ -146,46 +162,79 @@ export default function Home() {
               
               {includeMarkers && (
                 <div className="bg-gray-50 p-4 rounded-md space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Latitude
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={markerLat}
-                        onChange={(e) => setMarkerLat(e.target.value)}
-                        placeholder="e.g., -6.2428"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Longitude
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={markerLng}
-                        onChange={(e) => setMarkerLng(e.target.value)}
-                        placeholder="e.g., 106.8628"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-gray-700">Custom Markers</h3>
+                    <button
+                      type="button"
+                      onClick={addMarker}
+                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                    >
+                      + Add Marker
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Marker Name (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={markerName}
-                      onChange={(e) => setMarkerName(e.target.value)}
-                      placeholder="e.g., Custom Location"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
-                    />
-                  </div>
+                  
+                  {markers.length === 0 && (
+                    <p className="text-xs text-gray-500 text-center py-2">
+                      No markers added yet. Click "Add Marker" to create one.
+                    </p>
+                  )}
+                  
+                  {markers.map((marker, index) => (
+                    <div key={index} className="bg-white p-3 rounded-md border border-gray-200 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-gray-600">Marker {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeMarker(index)}
+                          className="text-red-500 hover:text-red-700 text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Latitude
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={marker.lat}
+                            onChange={(e) => updateMarker(index, 'lat', e.target.value)}
+                            placeholder="e.g., -6.2428"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Longitude
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={marker.lng}
+                            onChange={(e) => updateMarker(index, 'lng', e.target.value)}
+                            placeholder="e.g., 106.8628"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Marker Name (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={marker.name}
+                          onChange={(e) => updateMarker(index, 'name', e.target.value)}
+                          placeholder="e.g., Custom Location"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               
@@ -270,6 +319,18 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right duration-300">
+          <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">Copied to clipboard!</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

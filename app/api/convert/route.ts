@@ -43,11 +43,11 @@ export async function POST(request: NextRequest) {
     const { 
       data, 
       includeMarkers = false, 
-      markerData 
+      markers = []
     }: { 
       data: AreaData[], 
       includeMarkers?: boolean,
-      markerData?: { lat: number, lng: number, name: string }
+      markers?: Array<{ lat: number, lng: number, name: string }>
     } = await request.json();
 
     if (!Array.isArray(data)) {
@@ -108,20 +108,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Add custom marker if requested
-    if (includeMarkers && markerData) {
-      const pointFeature: GeoJSONFeature = {
-        type: 'Feature',
-        properties: {
-          name: markerData.name,
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: [markerData.lng, markerData.lat]
-        }
-      };
+    // Add custom markers if requested
+    if (includeMarkers && markers.length > 0) {
+      for (const marker of markers) {
+        const pointFeature: GeoJSONFeature = {
+          type: 'Feature',
+          properties: {
+            name: marker.name,
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [marker.lng, marker.lat]
+          }
+        };
 
-      features.push(pointFeature);
+        features.push(pointFeature);
+      }
     }
 
     const geojson: GeoJSONResponse = {
