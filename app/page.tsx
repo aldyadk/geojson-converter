@@ -25,6 +25,7 @@ export default function Home() {
     issue: 'invalid_latitude' | 'invalid_longitude' | 'both_invalid' | 'invalid_json';
     message: string;
   }>>([]);
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
   
   const t = getLocale(locale);
 
@@ -401,6 +402,7 @@ export default function Home() {
         </button>
       </div>
 
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <div className="flex justify-center items-center gap-4 mb-4">
@@ -415,6 +417,119 @@ export default function Home() {
           }`}>
             {t.description}
           </p>
+        </div>
+
+        {/* Mobile Accordion Instructions */}
+        <div className="lg:hidden mb-6">
+          <div className={`border rounded-md transition-colors duration-200 ${
+            isDarkMode 
+              ? 'bg-blue-900 border-blue-700' 
+              : 'bg-blue-50 border-blue-200'
+          }`}>
+            <button
+              onClick={() => setIsInstructionsOpen(!isInstructionsOpen)}
+              className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors duration-200 ${
+                isDarkMode 
+                  ? 'text-blue-300 hover:bg-blue-800' 
+                  : 'text-blue-900 hover:bg-blue-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>📖</span>
+                <span className="font-medium">{t.howToUse}</span>
+              </div>
+              <span className={`transform transition-transform duration-200 ${
+                isInstructionsOpen ? 'rotate-180' : ''
+              }`}>
+                ▼
+              </span>
+            </button>
+            
+            {isInstructionsOpen && (
+              <div className="px-4 pb-4 border-t border-blue-300 dark:border-blue-600">
+                <div className="pt-4">
+                  <ol className={`list-decimal list-inside space-y-2 transition-colors duration-200 ${
+                    isDarkMode ? 'text-blue-200' : 'text-blue-800'
+                  }`}>
+                    <li>{t.step1}</li>
+                    <li>{t.step2}</li>
+                    <li>{t.step3}</li>
+                    <li>{t.step4}</li>
+                  </ol>
+                  
+                  <div className="mt-4">
+                    <h4 className={`font-medium mb-2 transition-colors duration-200 ${
+                      isDarkMode ? 'text-blue-300' : 'text-blue-900'
+                    }`}>
+                      {t.expectedInputFormat}
+                    </h4>
+                    <p className={`text-sm transition-colors duration-200 ${
+                      isDarkMode ? 'text-blue-200' : 'text-blue-800'
+                    }`}>
+                      {t.expectedInputDescription}
+                    </p>
+                    
+                    <div className="mt-3">
+                      <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                        isDarkMode ? 'text-blue-300' : 'text-blue-900'
+                      }`}>
+                        {t.supportedCoordinateFormats}
+                      </h5>
+                      <div className={`text-sm space-y-1 font-mono transition-colors duration-200 ${
+                        isDarkMode ? 'text-blue-200' : 'text-blue-800'
+                      }`}>
+                        <div>{t.coordinateFormat1}</div>
+                        <div>{t.coordinateFormat2}</div>
+                        <div>{t.coordinateFormat3}</div>
+                        <div>{t.coordinateFormat4}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3">
+                      <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                        isDarkMode ? 'text-blue-300' : 'text-blue-900'
+                      }`}>
+                        {t.polygonFormatSupport}
+                      </h5>
+                      <div className={`text-sm space-y-1 font-mono transition-colors duration-200 ${
+                        isDarkMode ? 'text-blue-200' : 'text-blue-800'
+                      }`}>
+                        <div>{t.polygonFormat1}</div>
+                        <div>{t.polygonFormat2}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3">
+                      <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                        isDarkMode ? 'text-blue-300' : 'text-blue-900'
+                      }`}>
+                        {t.dataStructureSupport}
+                      </h5>
+                      <div className={`text-sm space-y-1 font-mono transition-colors duration-200 ${
+                        isDarkMode ? 'text-blue-200' : 'text-blue-800'
+                      }`}>
+                        <div>{t.dataStructure1}</div>
+                        <div>{t.dataStructure2}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3">
+                      <h5 className={`font-medium mb-2 transition-colors duration-200 ${
+                        isDarkMode ? 'text-red-300' : 'text-red-900'
+                      }`}>
+                        {t.requiredFields}
+                      </h5>
+                      <div className={`text-sm font-medium transition-colors duration-200 ${
+                        isDarkMode ? 'text-red-200' : 'text-red-800'
+                      }`}>
+                        {t.requiredFieldsNote}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -839,12 +954,15 @@ export default function Home() {
           </div>
         )}
 
-        {/* Instructions */}
-        <div className={`mt-8 border rounded-md p-6 transition-colors duration-200 ${
-          isDarkMode 
-            ? 'bg-blue-900 border-blue-700' 
-            : 'bg-blue-50 border-blue-200'
-        }`}>
+        {/* Instructions - Desktop Only */}
+        <div 
+          data-instructions-section
+          className={`hidden lg:block mt-8 border rounded-md p-6 transition-colors duration-200 ${
+            isDarkMode 
+              ? 'bg-blue-900 border-blue-700' 
+              : 'bg-blue-50 border-blue-200'
+          }`}
+        >
           <h3 className={`text-lg font-medium mb-3 transition-colors duration-200 ${
             isDarkMode ? 'text-blue-300' : 'text-blue-900'
           }`}>
