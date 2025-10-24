@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-interface StationData {
+interface FeatureData {
   name: string;
   polygon: string | Array<{ lat?: number; lng?: number; long?: number; latitude?: number; longitude?: number; lon?: number }>;
 }
 
 interface AreaData {
-  area_list: StationData[];
+  area_list: FeatureData[];
 }
 
 interface GeoJSONFeature {
@@ -32,60 +32,60 @@ export async function POST(request: NextRequest) {
       includeMarkers = false, 
       markers = []
     }: { 
-      data: AreaData[] | StationData[], 
+      data: AreaData[] | FeatureData[], 
       includeMarkers?: boolean,
       markers?: Array<{ lat: number, lng: number, name: string }>
     } = await request.json();
 
     if (!Array.isArray(data)) {
       return NextResponse.json(
-        { error: 'Invalid input: Expected an array of station data or area data' },
+        { error: 'Invalid input: Expected an array of feature data or area data' },
         { status: 400 }
       );
     }
 
-    const features: GeoJSONFeature[] = [];
+    const geojsonFeatures: GeoJSONFeature[] = [];
 
-    // Check if data is a simple array of stations or nested structure
+    // Check if data is a simple array of features or nested structure
     // If any item has an 'area_list' field, it's a nested structure
     const isSimpleArray = data.length > 0 && !data.some(item => 'area_list' in item);
     
     if (isSimpleArray) {
       // Handle simple array structure: [{ name, polygon }, ...]
-      const stations = data as StationData[];
+      const inputFeatures = data as FeatureData[];
       
-      // First, validate all stations have required fields
-      for (let i = 0; i < stations.length; i++) {
-        const station = stations[i];
-        if (!station.name) {
+      // First, validate all features have required fields
+      for (let i = 0; i < inputFeatures.length; i++) {
+        const feature = inputFeatures[i];
+        if (!feature.name) {
           return NextResponse.json(
-            { error: `Station at index ${i}: Missing required 'name' field` },
+            { error: `Feature at index ${i}: Missing required 'name' field` },
             { status: 400 }
           );
         }
-        if (!station.polygon) {
+        if (!feature.polygon) {
           return NextResponse.json(
-            { error: `Station at index ${i}: Missing required 'polygon' field` },
+            { error: `Feature at index ${i}: Missing required 'polygon' field` },
             { status: 400 }
           );
         }
       }
       
-      // Process all stations
-      for (const station of stations) {
+      // Process all features
+      for (const feature of inputFeatures) {
         try {
           
           // Handle both stringified JSON and real JSON array formats
           let polygonData: any;
           
-          if (typeof station.polygon === 'string') {
+          if (typeof feature.polygon === 'string') {
             // Parse the polygon string
-            polygonData = JSON.parse(station.polygon);
-          } else if (Array.isArray(station.polygon)) {
+            polygonData = JSON.parse(feature.polygon);
+          } else if (Array.isArray(feature.polygon)) {
             // Use the polygon array directly
-            polygonData = station.polygon;
+            polygonData = feature.polygon;
           } else {
-            console.error(`Invalid polygon format for station ${station.name}:`, station.polygon);
+            console.error(`Invalid polygon format for ${feature.name}:`, feature.polygon);
             continue;
           }
           
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
           const polygonFeature: GeoJSONFeature = {
             type: 'Feature',
             properties: {
-              name: station.name,
+              name: feature.name,
             },
             geometry: {
               type: 'Polygon',
@@ -144,60 +144,60 @@ export async function POST(request: NextRequest) {
             }
           };
 
-          features.push(polygonFeature);
+          geojsonFeatures.push(polygonFeature);
         } catch (error) {
-          console.error(`Error processing station ${station.name}:`, error);
-          // Continue processing other stations
+          console.error(`Error processing feature ${feature.name}:`, error);
+          // Continue processing other features
         }
       }
     } else {
       // Handle nested structure: [{ area_list: [{ name, polygon }, ...] }, ...]
       const areas = data as AreaData[];
       
-      // First, validate all stations have required fields
+      // First, validate all features have required fields
       for (let areaIndex = 0; areaIndex < areas.length; areaIndex++) {
         const area = areas[areaIndex];
         if (!area.area_list || !Array.isArray(area.area_list)) {
           continue;
         }
         
-        for (let stationIndex = 0; stationIndex < area.area_list.length; stationIndex++) {
-          const station = area.area_list[stationIndex];
-          if (!station.name) {
+        for (let featureIndex = 0; featureIndex < area.area_list.length; featureIndex++) {
+          const feature = area.area_list[featureIndex];
+          if (!feature.name) {
             return NextResponse.json(
-              { error: `Station at area[${areaIndex}].area_list[${stationIndex}]: Missing required 'name' field` },
+              { error: `Feature at area[${areaIndex}].area_list[${featureIndex}]: Missing required 'name' field` },
               { status: 400 }
             );
           }
-          if (!station.polygon) {
+          if (!feature.polygon) {
             return NextResponse.json(
-              { error: `Station at area[${areaIndex}].area_list[${stationIndex}]: Missing required 'polygon' field` },
+              { error: `Feature at area[${areaIndex}].area_list[${featureIndex}]: Missing required 'polygon' field` },
               { status: 400 }
             );
           }
         }
       }
       
-      // Process all stations
+      // Process all features
       for (const area of areas) {
         if (!area.area_list || !Array.isArray(area.area_list)) {
           continue;
         }
 
-        for (const station of area.area_list) {
+        for (const feature of area.area_list) {
           try {
             
             // Handle both stringified JSON and real JSON array formats
             let polygonData: any;
             
-            if (typeof station.polygon === 'string') {
+            if (typeof feature.polygon === 'string') {
               // Parse the polygon string
-              polygonData = JSON.parse(station.polygon);
-            } else if (Array.isArray(station.polygon)) {
+              polygonData = JSON.parse(feature.polygon);
+            } else if (Array.isArray(feature.polygon)) {
               // Use the polygon array directly
-              polygonData = station.polygon;
+              polygonData = feature.polygon;
             } else {
-              console.error(`Invalid polygon format for station ${station.name}:`, station.polygon);
+              console.error(`Invalid polygon format for ${feature.name}:`, feature.polygon);
               continue;
             }
             
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
             const polygonFeature: GeoJSONFeature = {
               type: 'Feature',
               properties: {
-                name: station.name,
+                name: feature.name,
               },
               geometry: {
                 type: 'Polygon',
@@ -256,10 +256,10 @@ export async function POST(request: NextRequest) {
               }
             };
 
-            features.push(polygonFeature);
+            geojsonFeatures.push(polygonFeature);
           } catch (error) {
-            console.error(`Error processing station ${station.name}:`, error);
-            // Continue processing other stations
+            console.error(`Error processing feature ${feature.name}:`, error);
+            // Continue processing other features
           }
         }
       }
@@ -279,13 +279,13 @@ export async function POST(request: NextRequest) {
           }
         };
 
-        features.push(pointFeature);
+        geojsonFeatures.push(pointFeature);
       }
     }
 
     const geojson: GeoJSONResponse = {
       type: 'FeatureCollection',
-      features: features
+      features: geojsonFeatures
     };
 
     return NextResponse.json(geojson, {
