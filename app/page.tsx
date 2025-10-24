@@ -17,6 +17,14 @@ export default function Home() {
   const [showToast, setShowToast] = useState(false);
   const [locale, setLocale] = useState<Locale>('en');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<Array<{
+    featureIndex: number;
+    featureName: string;
+    coordinateIndex: number;
+    coordinate: [number, number];
+    issue: 'invalid_latitude' | 'invalid_longitude' | 'both_invalid' | 'invalid_json';
+    message: string;
+  }>>([]);
   
   const t = getLocale(locale);
 
@@ -36,6 +44,21 @@ export default function Home() {
     }
   }, [searchParams]);
 
+  // Auto-scroll to output container on mobile after successful conversion (API-based)
+  useEffect(() => {
+    if (outputData && window.innerWidth < 768) { // Mobile breakpoint
+      requestAnimationFrame(() => {
+        const outputSection = document.querySelector('[data-output-section]');
+        if (outputSection) {
+          outputSection.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    }
+  }, [outputData]);
+
   // Update URL when locale or theme changes
   const updateUrl = (newLocale: Locale, newTheme: boolean) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -53,10 +76,34 @@ export default function Home() {
     setLoading(true);
     setError('');
     setOutputData('');
+    setValidationWarnings([]);
 
     try {
-      // Validate JSON
-      const parsedData = JSON.parse(inputData);
+      // Validate JSON with enhanced error handling
+      let parsedData;
+      try {
+        parsedData = JSON.parse(inputData);
+      } catch (jsonError) {
+        // Enhanced JSON parsing error with line numbers
+        if (jsonError instanceof SyntaxError) {
+          const errorMessage = jsonError.message;
+          const match = errorMessage.match(/position (\d+)/);
+          if (match) {
+            const position = parseInt(match[1]);
+            const lines = inputData.substring(0, position).split('\n');
+            const lineNumber = lines.length;
+            const columnNumber = lines[lines.length - 1].length + 1;
+            const allLines = inputData.split('\n');
+            const problematicLine = allLines[lineNumber - 1] || '';
+            
+            throw new Error(`JSON Syntax Error at line ${lineNumber}, column ${columnNumber}:\n${errorMessage}\n\nProblematic line: "${problematicLine}"`);
+          } else {
+            throw new Error(`JSON Syntax Error: ${errorMessage}`);
+          }
+        } else {
+          throw new Error(`JSON Parsing Error: ${jsonError instanceof Error ? jsonError.message : 'Unknown error'}`);
+        }
+      }
       
       // Validate markers if includeMarkers is enabled
       if (includeMarkers && markers.length > 0) {
@@ -100,10 +147,30 @@ export default function Home() {
         throw new Error(errorData.error || t.failedToConvertData);
       }
 
-      const geojson = await response.json();
-      setOutputData(JSON.stringify(geojson, null, 2));
+      const responseData = await response.json();
+      setOutputData(JSON.stringify(responseData.geojson, null, 2));
+      
+      // Handle validation warnings
+      if (responseData.warnings && responseData.warnings.length > 0) {
+        setValidationWarnings(responseData.warnings);
+      } else {
+        setValidationWarnings([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.anErrorOccurred);
+      
+      // Auto-scroll to error container on mobile (using setTimeout for immediate client errors)
+      setTimeout(() => {
+        if (window.innerWidth < 768) { // Mobile breakpoint
+          const errorSection = document.querySelector('[data-error-section-mobile]');
+          if (errorSection) {
+            errorSection.scrollIntoView({ 
+              behavior: 'smooth',
+              block: 'center'
+            });
+          }
+        }
+      }, 100); // Small delay to ensure DOM is updated
     } finally {
       setLoading(false);
     }
@@ -282,6 +349,58 @@ export default function Home() {
     <div className={`min-h-screen py-8 relative transition-colors duration-200 ${
       isDarkMode ? 'bg-gray-900' : 'bg-gray-50'
     }`}>
+      {/* Sticky Settings Controls */}
+      <div className="fixed bottom-4 right-4 md:top-4 md:right-4 md:bottom-auto z-50 flex flex-col gap-2 md:scale-100 scale-90 sm:scale-95">
+        {/* Language Selection */}
+        <div className={`flex rounded-lg shadow-lg backdrop-blur-sm transition-colors duration-200 ${
+          isDarkMode ? 'bg-gray-800/90 border border-gray-700' : 'bg-white/90 border border-gray-200'
+        }`}>
+          <button
+            onClick={() => {
+              setLocale('en');
+              updateUrl('en', isDarkMode);
+            }}
+            className={`px-3 py-2 text-sm font-medium rounded-l-lg transition-colors duration-200 ${
+              locale === 'en'
+                ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700')
+                : (isDarkMode ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100')
+            }`}
+          >
+            EN
+          </button>
+          <button
+            onClick={() => {
+              setLocale('id');
+              updateUrl('id', isDarkMode);
+            }}
+            className={`px-3 py-2 text-sm font-medium rounded-r-lg transition-colors duration-200 ${
+              locale === 'id'
+                ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700')
+                : (isDarkMode ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100')
+            }`}
+          >
+            ID
+          </button>
+        </div>
+
+        {/* Dark Mode Toggle */}
+        <button
+          onClick={() => {
+            const newTheme = !isDarkMode;
+            setIsDarkMode(newTheme);
+            updateUrl(locale, newTheme);
+          }}
+          className={`p-3 rounded-lg shadow-lg backdrop-blur-sm transition-colors duration-200 ${
+            isDarkMode 
+              ? 'bg-gray-800/90 border border-gray-700 text-yellow-400 hover:bg-gray-700/90' 
+              : 'bg-white/90 border border-gray-200 text-gray-600 hover:bg-gray-50/90'
+          }`}
+          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {isDarkMode ? '☀️' : '🌙'}
+        </button>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <div className="flex justify-center items-center gap-4 mb-4">
@@ -290,52 +409,6 @@ export default function Home() {
             }`}>
               {t.title}
             </h1>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setLocale('en');
-                  updateUrl('en', isDarkMode);
-                }}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  locale === 'en' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDarkMode 
-                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                EN
-              </button>
-              <button
-                onClick={() => {
-                  setLocale('id');
-                  updateUrl('id', isDarkMode);
-                }}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  locale === 'id' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDarkMode 
-                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                ID
-              </button>
-              <button
-                onClick={() => {
-                  const newTheme = !isDarkMode;
-                  setIsDarkMode(newTheme);
-                  updateUrl(locale, newTheme);
-                }}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  isDarkMode 
-                    ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-400' 
-                    : 'bg-gray-800 text-white hover:bg-gray-700'
-                }`}
-              >
-                {isDarkMode ? '☀️' : '🌙'}
-              </button>
-            </div>
           </div>
           <p className={`text-lg max-w-2xl mx-auto transition-colors duration-200 ${
             isDarkMode ? 'text-gray-300' : 'text-gray-600'
@@ -527,40 +600,93 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Error Display - Mobile Only (below input container) */}
+          {error && (
+            <div 
+              data-error-section-mobile
+              className={`lg:hidden mt-4 border rounded-md p-4 transition-colors duration-200 ${
+                isDarkMode 
+                  ? 'bg-red-900 border-red-700' 
+                  : 'bg-red-50 border-red-200'
+              }`}
+            >
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className={`text-sm font-medium transition-colors duration-200 ${
+                    isDarkMode ? 'text-red-300' : 'text-red-800'
+                  }`}>
+                    {t.error}
+                  </h3>
+                  <div className={`mt-2 text-sm transition-colors duration-200 ${
+                    isDarkMode ? 'text-red-400' : 'text-red-700'
+                  }`}>
+                    <pre className="whitespace-pre-wrap font-mono">{error}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Output Section */}
-          <div className={`rounded-lg shadow-md p-6 transition-colors duration-200 ${
-            isDarkMode ? 'bg-gray-800' : 'bg-white'
-          }`}>
+          <div 
+            data-output-section
+            className={`rounded-lg shadow-md p-6 transition-colors duration-200 ${
+              isDarkMode ? 'bg-gray-800' : 'bg-white'
+            }`}
+          >
             <div className="flex justify-between items-center mb-4">
               <h2 className={`text-xl font-semibold transition-colors duration-200 ${
                 isDarkMode ? 'text-white' : 'text-gray-900'
               }`}>
                 {t.geojsonOutput}
               </h2>
-              {outputData && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleCopy}
-                    className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                      isDarkMode 
-                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}
-                  >
-                    {t.copy}
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                      isDarkMode 
-                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-green-100 text-green-700 hover:bg-green-200'
-                    }`}
-                  >
-                    {t.download}
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCopy}
+                  disabled={!outputData}
+                  className={`px-4 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                    outputData
+                      ? (validationWarnings.length > 0
+                          ? (isDarkMode 
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                              : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200')
+                          : (isDarkMode 
+                              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'))
+                      : (isDarkMode 
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed')
+                  }`}
+                >
+                  {validationWarnings.length > 0 && <span>⚠️</span>}
+                  {t.copy}
+                </button>
+                <button
+                  onClick={handleDownload}
+                  disabled={!outputData}
+                  className={`px-4 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                    outputData
+                      ? (validationWarnings.length > 0
+                          ? (isDarkMode 
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                              : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200')
+                          : (isDarkMode 
+                              ? 'bg-green-600 text-white hover:bg-green-700' 
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'))
+                      : (isDarkMode 
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed')
+                  }`}
+                >
+                  {validationWarnings.length > 0 && <span>⚠️</span>}
+                  {t.download}
+                </button>
+              </div>
             </div>
             
             <textarea
@@ -573,16 +699,124 @@ export default function Home() {
                   : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'
               }`}
             />
+            
+            {/* Simple Warning Indicator */}
+            {validationWarnings.length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    // Scroll to the detailed warnings section
+                    const warningsSection = document.querySelector('[data-warnings-section]');
+                    if (warningsSection) {
+                      warningsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-md border transition-colors duration-200 hover:opacity-80 ${
+                    isDarkMode 
+                      ? 'bg-yellow-900 border-yellow-700 text-yellow-300 hover:bg-yellow-800' 
+                      : 'bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100'
+                  }`}
+                >
+                  <span className="text-sm">⚠️</span>
+                  <span className="text-sm font-medium">
+                    {t.validationWarningsFound
+                      .replace('{count}', validationWarnings.length.toString())
+                      .replace('{plural}', validationWarnings.length !== 1 ? 's' : '')
+                    }
+                  </span>
+                  <span className="text-xs opacity-75">{t.clickToViewDetails}</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Error Display */}
+        {/* Validation Warnings Display */}
+        {validationWarnings.length > 0 && (
+          <div 
+            data-warnings-section
+            className={`mt-6 border rounded-md p-4 transition-colors duration-200 ${
+              isDarkMode 
+                ? 'bg-yellow-900 border-yellow-700' 
+                : 'bg-yellow-50 border-yellow-200'
+            }`}
+          >
+            <div className="flex items-center mb-3">
+              <div className={`text-lg mr-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                ⚠️
+              </div>
+              <h3 className={`text-lg font-semibold transition-colors duration-200 ${
+                isDarkMode ? 'text-yellow-300' : 'text-yellow-800'
+              }`}>
+                {t.coordinateValidation}
+              </h3>
+            </div>
+            
+            <p className={`text-sm mb-4 transition-colors duration-200 ${
+              isDarkMode ? 'text-yellow-200' : 'text-yellow-700'
+            }`}>
+              {t.warningSummary.replace('{count}', validationWarnings.length.toString())}
+            </p>
+            
+            <div className="space-y-3">
+              {validationWarnings.map((warning, index) => (
+                <div key={index} className={`p-3 rounded-md transition-colors duration-200 ${
+                  isDarkMode ? 'bg-yellow-800' : 'bg-yellow-100'
+                }`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium transition-colors duration-200 ${
+                        isDarkMode ? 'text-yellow-200' : 'text-yellow-800'
+                      }`}>
+                        {warning.featureIndex === -1 
+                          ? t.warningCustomMarker 
+                          : t.warningFeature.replace('{name}', warning.featureName)
+                        }
+                      </p>
+                      {warning.coordinateIndex !== -1 && (
+                        <p className={`text-xs mt-1 transition-colors duration-200 ${
+                          isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
+                        }`}>
+                          {t.warningCoordinate
+                            .replace('{index}', (warning.coordinateIndex + 1).toString())
+                            .replace('{coordinate}', `[${warning.coordinate[0]}, ${warning.coordinate[1]}]`)
+                          }
+                        </p>
+                      )}
+                      <p className={`text-xs mt-1 transition-colors duration-200 ${
+                        isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
+                      }`}>
+                        {t.warningMessage.replace('{message}', warning.message)}
+                      </p>
+                    </div>
+                    <div className={`ml-3 px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+                      warning.issue === 'both_invalid' 
+                        ? (isDarkMode ? 'bg-red-700 text-red-200' : 'bg-red-100 text-red-800')
+                        : warning.issue === 'invalid_json'
+                        ? (isDarkMode ? 'bg-purple-700 text-purple-200' : 'bg-purple-100 text-purple-800')
+                        : (isDarkMode ? 'bg-orange-700 text-orange-200' : 'bg-orange-100 text-orange-800')
+                    }`}>
+                      {warning.issue === 'both_invalid' ? t.warningBothInvalid : 
+                       warning.issue === 'invalid_latitude' ? t.warningInvalidLatitude : 
+                       warning.issue === 'invalid_longitude' ? t.warningInvalidLongitude : t.warningInvalidJson}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Error Display - Desktop Only (below all content) */}
         {error && (
-          <div className={`mt-6 border rounded-md p-4 transition-colors duration-200 ${
-            isDarkMode 
-              ? 'bg-red-900 border-red-700' 
-              : 'bg-red-50 border-red-200'
-          }`}>
+          <div 
+            data-error-section
+            className={`hidden lg:block mt-6 border rounded-md p-4 transition-colors duration-200 ${
+              isDarkMode 
+                ? 'bg-red-900 border-red-700' 
+                : 'bg-red-50 border-red-200'
+            }`}
+          >
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -598,7 +832,7 @@ export default function Home() {
                 <div className={`mt-2 text-sm transition-colors duration-200 ${
                   isDarkMode ? 'text-red-400' : 'text-red-700'
                 }`}>
-                  {error}
+                  <pre className="whitespace-pre-wrap font-mono">{error}</pre>
                 </div>
               </div>
             </div>
