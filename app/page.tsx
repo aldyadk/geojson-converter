@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { getLocale, type Locale } from '../lib/locales';
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
   const [inputData, setInputData] = useState('');
   const [outputData, setOutputData] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,6 +19,30 @@ export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   const t = getLocale(locale);
+
+  // Initialize from URL parameters
+  useEffect(() => {
+    const urlLocale = searchParams.get('lang') as Locale;
+    const urlTheme = searchParams.get('theme');
+    
+    if (urlLocale && (urlLocale === 'en' || urlLocale === 'id')) {
+      setLocale(urlLocale);
+    }
+    
+    if (urlTheme === 'dark') {
+      setIsDarkMode(true);
+    } else if (urlTheme === 'light') {
+      setIsDarkMode(false);
+    }
+  }, [searchParams]);
+
+  // Update URL when locale or theme changes
+  const updateUrl = (newLocale: Locale, newTheme: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('lang', newLocale);
+    params.set('theme', newTheme ? 'dark' : 'light');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
 
   const handleConvert = async () => {
     if (!inputData.trim()) {
@@ -135,7 +163,10 @@ export default function Home() {
             </h1>
             <div className="flex gap-2">
               <button
-                onClick={() => setLocale('en')}
+                onClick={() => {
+                  setLocale('en');
+                  updateUrl('en', isDarkMode);
+                }}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   locale === 'en' 
                     ? 'bg-blue-600 text-white' 
@@ -147,7 +178,10 @@ export default function Home() {
                 EN
               </button>
               <button
-                onClick={() => setLocale('id')}
+                onClick={() => {
+                  setLocale('id');
+                  updateUrl('id', isDarkMode);
+                }}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   locale === 'id' 
                     ? 'bg-blue-600 text-white' 
@@ -159,7 +193,11 @@ export default function Home() {
                 ID
               </button>
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={() => {
+                  const newTheme = !isDarkMode;
+                  setIsDarkMode(newTheme);
+                  updateUrl(locale, newTheme);
+                }}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   isDarkMode 
                     ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-400' 
