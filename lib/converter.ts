@@ -1,17 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
 
-type ValidationIssue = 'invalid_latitude' | 'invalid_longitude' | 'both_invalid' | 'invalid_json';
+export type ValidationIssue = 'invalid_latitude' | 'invalid_longitude' | 'both_invalid' | 'invalid_json';
 
-interface FeatureData {
+export interface FeatureData {
   name: string;
   polygon: string | Array<{ lat?: number; lng?: number; long?: number; latitude?: number; longitude?: number; lon?: number }>;
 }
 
-interface AreaData {
+export interface AreaData {
   area_list: FeatureData[];
 }
 
-interface GeoJSONFeature {
+export interface GeoJSONFeature {
   type: 'Feature';
   properties: {
     name: string;
@@ -22,7 +21,7 @@ interface GeoJSONFeature {
   };
 }
 
-interface CoordinateWarning {
+export interface CoordinateWarning {
   featureIndex: number;
   featureName: string;
   coordinateIndex: number;
@@ -31,14 +30,15 @@ interface CoordinateWarning {
   message: string;
 }
 
-interface GeoJSONResponse {
+export interface GeoJSONResponse {
   type: 'FeatureCollection';
   features: GeoJSONFeature[];
 }
 
-interface APIResponse {
+export interface ConversionResult {
   geojson: GeoJSONResponse;
   warnings?: CoordinateWarning[];
+  error?: string;
 }
 
 // Coordinate validation function
@@ -46,10 +46,10 @@ function validateCoordinate(lat: any, lng: any): { isValid: boolean; issue?: Val
   // Check if coordinates are valid numbers
   const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
   const lngNum = typeof lng === 'number' ? lng : parseFloat(lng);
-  
+
   const latIsNumber = !isNaN(latNum) && isFinite(latNum);
   const lngIsNumber = !isNaN(lngNum) && isFinite(lngNum);
-  
+
   if (!latIsNumber && !lngIsNumber) {
     return {
       isValid: false,
@@ -69,11 +69,11 @@ function validateCoordinate(lat: any, lng: any): { isValid: boolean; issue?: Val
       message: `Invalid longitude: "${lng}" is not a valid number`
     };
   }
-  
+
   // Now check ranges with valid numbers
   const latValid = latNum >= -90 && latNum <= 90;
   const lngValid = lngNum >= -180 && lngNum <= 180;
-  
+
   if (!latValid && !lngValid) {
     return {
       isValid: false,
@@ -93,27 +93,21 @@ function validateCoordinate(lat: any, lng: any): { isValid: boolean; issue?: Val
       message: `Invalid longitude: ${lngNum} (must be between -180 and 180 degrees)`
     };
   }
-  
+
   return { isValid: true };
 }
 
-export async function POST(request: NextRequest) {
+export function convertData(
+  data: AreaData[] | FeatureData[],
+  includeMarkers: boolean = false,
+  markers: Array<{ lat: number, lng: number, name: string }> = []
+): ConversionResult {
   try {
-    const { 
-      data, 
-      includeMarkers = false, 
-      markers = []
-    }: { 
-      data: AreaData[] | FeatureData[], 
-      includeMarkers?: boolean,
-      markers?: Array<{ lat: number, lng: number, name: string }>
-    } = await request.json();
-
     if (!Array.isArray(data)) {
-      return NextResponse.json(
-        { error: 'Invalid input: Expected an array of feature data or area data' },
-        { status: 400 }
-      );
+      return {
+        geojson: { type: 'FeatureCollection', features: [] },
+        error: 'Invalid input: Expected an array of feature data or area data'
+      };
     }
 
     const geojsonFeatures: GeoJSONFeature[] = [];
@@ -122,35 +116,35 @@ export async function POST(request: NextRequest) {
     // Check if data is a simple array of features or nested structure
     // If any item has an 'area_list' field, it's a nested structure
     const isSimpleArray = data.length > 0 && !data.some(item => 'area_list' in item);
-    
+
     if (isSimpleArray) {
       // Handle simple array structure: [{ name, polygon }, ...]
       const inputFeatures = data as FeatureData[];
-      
+
       // First, validate all features have required fields
       for (let i = 0; i < inputFeatures.length; i++) {
         const feature = inputFeatures[i];
         if (!feature.name) {
-          return NextResponse.json(
-            { error: `Feature at index ${i}: Missing required 'name' field` },
-            { status: 400 }
-          );
+          return {
+            geojson: { type: 'FeatureCollection', features: [] },
+            error: `Feature at index ${i}: Missing required 'name' field`
+          };
         }
         if (!feature.polygon) {
-          return NextResponse.json(
-            { error: `Feature at index ${i}: Missing required 'polygon' field` },
-            { status: 400 }
-          );
+          return {
+            geojson: { type: 'FeatureCollection', features: [] },
+            error: `Feature at index ${i}: Missing required 'polygon' field`
+          };
         }
       }
-      
+
       // Process all features
       for (const feature of inputFeatures) {
         try {
-          
+
           // Handle both stringified JSON and real JSON array formats
           let polygonData: any;
-          
+
           if (typeof feature.polygon === 'string') {
             try {
               // Parse the polygon string
@@ -174,7 +168,7 @@ export async function POST(request: NextRequest) {
             console.error(`Invalid polygon format for ${feature.name}:`, feature.polygon);
             continue;
           }
-          
+
           if (!Array.isArray(polygonData) || polygonData.length === 0) {
             continue;
           }
@@ -183,7 +177,7 @@ export async function POST(request: NextRequest) {
           // Support multiple coordinate field formats
           const coordinates = polygonData.map((point: any, coordIndex: number) => {
             let lat: any, lng: any;
-            
+
             // Try different coordinate field name combinations
             if (point.lat !== undefined && point.long !== undefined) {
               // Format: { lat: -6.2428, long: 106.8628 }
@@ -205,14 +199,14 @@ export async function POST(request: NextRequest) {
               // Skip invalid coordinate format
               throw new Error(`Invalid coordinate format: ${JSON.stringify(point)}`);
             }
-            
+
             // Validate coordinates (handles both data type and range validation)
             const validation = validateCoordinate(lat, lng);
             if (!validation.isValid) {
               // Use the original values for display, but try to convert for coordinate array
               const lngNum = typeof lng === 'number' ? lng : parseFloat(lng);
               const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
-              
+
               coordinateWarnings.push({
                 featureIndex: inputFeatures.indexOf(feature),
                 featureName: feature.name,
@@ -221,15 +215,15 @@ export async function POST(request: NextRequest) {
                 issue: validation.issue!,
                 message: validation.message!
               });
-              
+
               // If coordinates are invalid, use 0,0 as fallback
               return [isNaN(lngNum) ? 0 : lngNum, isNaN(latNum) ? 0 : latNum];
             }
-            
+
             // Convert to numbers for GeoJSON format
             const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
             const lngNum = typeof lng === 'number' ? lng : parseFloat(lng);
-            
+
             return [lngNum, latNum]; // GeoJSON format: [longitude, latitude]
           });
 
@@ -240,9 +234,9 @@ export async function POST(request: NextRequest) {
             // Check if both points are valid (not NaN) before comparing
             const firstPointValid = !isNaN(firstPoint[0]) && !isNaN(firstPoint[1]);
             const lastPointValid = !isNaN(lastPoint[0]) && !isNaN(lastPoint[1]);
-            
-            if (firstPointValid && lastPointValid && 
-                (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1])) {
+
+            if (firstPointValid && lastPointValid &&
+              (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1])) {
               coordinates.push([...firstPoint]);
             }
           }
@@ -268,31 +262,31 @@ export async function POST(request: NextRequest) {
     } else {
       // Handle nested structure: [{ area_list: [{ name, polygon }, ...] }, ...]
       const areas = data as AreaData[];
-      
+
       // First, validate all features have required fields
       for (let areaIndex = 0; areaIndex < areas.length; areaIndex++) {
         const area = areas[areaIndex];
         if (!area.area_list || !Array.isArray(area.area_list)) {
           continue;
         }
-        
+
         for (let featureIndex = 0; featureIndex < area.area_list.length; featureIndex++) {
           const feature = area.area_list[featureIndex];
           if (!feature.name) {
-            return NextResponse.json(
-              { error: `Feature at area[${areaIndex}].area_list[${featureIndex}]: Missing required 'name' field` },
-              { status: 400 }
-            );
+            return {
+              geojson: { type: 'FeatureCollection', features: [] },
+              error: `Feature at area[${areaIndex}].area_list[${featureIndex}]: Missing required 'name' field`
+            };
           }
           if (!feature.polygon) {
-            return NextResponse.json(
-              { error: `Feature at area[${areaIndex}].area_list[${featureIndex}]: Missing required 'polygon' field` },
-              { status: 400 }
-            );
+            return {
+              geojson: { type: 'FeatureCollection', features: [] },
+              error: `Feature at area[${areaIndex}].area_list[${featureIndex}]: Missing required 'polygon' field`
+            };
           }
         }
       }
-      
+
       // Process all features
       for (const area of areas) {
         if (!area.area_list || !Array.isArray(area.area_list)) {
@@ -301,10 +295,10 @@ export async function POST(request: NextRequest) {
 
         for (const feature of area.area_list) {
           try {
-            
+
             // Handle both stringified JSON and real JSON array formats
             let polygonData: any;
-            
+
             if (typeof feature.polygon === 'string') {
               try {
                 // Parse the polygon string
@@ -317,7 +311,7 @@ export async function POST(request: NextRequest) {
                   globalFeatureIndex += areas[i].area_list?.length || 0;
                 }
                 globalFeatureIndex += area.area_list.indexOf(feature);
-                
+
                 coordinateWarnings.push({
                   featureIndex: globalFeatureIndex,
                   featureName: feature.name,
@@ -335,7 +329,7 @@ export async function POST(request: NextRequest) {
               console.error(`Invalid polygon format for ${feature.name}:`, feature.polygon);
               continue;
             }
-            
+
             if (!Array.isArray(polygonData) || polygonData.length === 0) {
               continue;
             }
@@ -344,7 +338,7 @@ export async function POST(request: NextRequest) {
             // Support multiple coordinate field formats
             const coordinates = polygonData.map((point: any, coordIndex: number) => {
               let lat: any, lng: any;
-              
+
               // Try different coordinate field name combinations
               if (point.lat !== undefined && point.long !== undefined) {
                 // Format: { lat: -6.2428, long: 106.8628 }
@@ -366,7 +360,7 @@ export async function POST(request: NextRequest) {
                 // Skip invalid coordinate format
                 throw new Error(`Invalid coordinate format: ${JSON.stringify(point)}`);
               }
-              
+
               // Validate coordinates (handles both data type and range validation)
               const validation = validateCoordinate(lat, lng);
               if (!validation.isValid) {
@@ -376,11 +370,11 @@ export async function POST(request: NextRequest) {
                   globalFeatureIndex += areas[i].area_list?.length || 0;
                 }
                 globalFeatureIndex += area.area_list.indexOf(feature);
-                
+
                 // Use the original values for display, but try to convert for coordinate array
                 const lngNum = typeof lng === 'number' ? lng : parseFloat(lng);
                 const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
-                
+
                 coordinateWarnings.push({
                   featureIndex: globalFeatureIndex,
                   featureName: feature.name,
@@ -389,15 +383,15 @@ export async function POST(request: NextRequest) {
                   issue: validation.issue!,
                   message: validation.message!
                 });
-                
+
                 // If coordinates are invalid, use 0,0 as fallback
                 return [isNaN(lngNum) ? 0 : lngNum, isNaN(latNum) ? 0 : latNum];
               }
-              
+
               // Convert to numbers for GeoJSON format
               const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
               const lngNum = typeof lng === 'number' ? lng : parseFloat(lng);
-              
+
               return [lngNum, latNum]; // GeoJSON format: [longitude, latitude]
             });
 
@@ -408,9 +402,9 @@ export async function POST(request: NextRequest) {
               // Check if both points are valid (not NaN) before comparing
               const firstPointValid = !isNaN(firstPoint[0]) && !isNaN(firstPoint[1]);
               const lastPointValid = !isNaN(lastPoint[0]) && !isNaN(lastPoint[1]);
-              
-              if (firstPointValid && lastPointValid && 
-                  (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1])) {
+
+              if (firstPointValid && lastPointValid &&
+                (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1])) {
                 coordinates.push([...firstPoint]);
               }
             }
@@ -451,7 +445,7 @@ export async function POST(request: NextRequest) {
             message: `Custom marker: ${validation.message!}`
           });
         }
-        
+
         const pointFeature: GeoJSONFeature = {
           type: 'Feature',
           properties: {
@@ -472,21 +466,16 @@ export async function POST(request: NextRequest) {
       features: geojsonFeatures
     };
 
-    return NextResponse.json({
+    return {
       geojson: geojson,
       warnings: coordinateWarnings.length > 0 ? coordinateWarnings : undefined
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Disposition': 'attachment; filename="stations.geojson"'
-      }
-    });
+    };
 
   } catch (error) {
     console.error('Error converting data to GeoJSON:', error);
-    return NextResponse.json(
-      { error: 'Failed to convert data to GeoJSON' },
-      { status: 500 }
-    );
+    return {
+      geojson: { type: 'FeatureCollection', features: [] },
+      error: 'Failed to convert data to GeoJSON'
+    };
   }
 }
